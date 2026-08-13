@@ -8,29 +8,23 @@ The lab is being developed in phases so that each part of the network can be des
 
 ## Current Status
 
-**Completed through Phase 3: IP Addressing Design**
+**Completed through Phase 4: VLAN Configuration and Access Port Assignment**
 
-So far, the project includes:
+Completed so far:
 
-- A complete physical enterprise network topology in Cisco Packet Tracer
-- A simulated ISP and external network
-- A Cisco ASA firewall separating internal, DMZ, and external networks
-- A Layer 3 core switch and two access switches
-- Corporate, engineering, guest, management, server, and DMZ segments
-- A complete VLAN and subnet addressing plan
-- Planned static infrastructure addresses
-- Planned DHCP client ranges
-- A dedicated core-to-firewall transit network
-- A simulated WAN and public network
-- Updated Packet Tracer topology labels showing network roles and addressing
+- Built the physical enterprise topology in Cisco Packet Tracer
+- Added a simulated ISP, Cisco ASA firewall, Layer 3 core switch, two access switches, internal hosts, servers, a DMZ server, and a simulated external host
+- Designed the VLAN and IP addressing plan
+- Planned static infrastructure addresses and DHCP client ranges
+- Created VLANs 10, 20, 30, 40, 99, and 999 on the internal switches
+- Assigned end-device access ports to their intended VLANs
+- Verified VLAN membership using Cisco IOS show commands
 
-No VLAN, routing, DHCP, ACL, firewall, NAT, or switch-security configurations have been implemented yet.
+Trunking, inter-VLAN routing, DHCP, firewall rules, NAT, ACLs, and other security controls have not yet been implemented.
 
 ## Network Topology
 
 ![Enterprise Network Topology](screenshots/topology.png)
-
-The current topology is designed to represent a small enterprise environment with internal users, servers, network management, a DMZ, an edge firewall, and a simulated Internet connection.
 
 ```text
                          PUBLIC-PC-01
@@ -52,8 +46,6 @@ The current topology is designed to represent a small enterprise environment wit
                     /     \
                    /       \
           ACCESS-SW1       ACCESS-SW2
-             |                  |
-       Internal VLANs      Internal VLANs
 ```
 
 ## VLAN and Subnet Design
@@ -68,29 +60,17 @@ The current topology is designed to represent a small enterprise environment wit
 | 99 | Network Management | `10.10.99.0/24` | `10.10.99.1` |
 | 999 | Parking / Unused Ports | None | None |
 
-VLAN 999 will later be used to isolate unused switch ports.
+VLAN 50 is part of the DMZ design and will be handled through the firewall side of the topology rather than across the internal access switches.
 
 ## Addressing Strategy
 
-The internal addressing scheme follows a predictable structure:
+Internal VLANs follow this pattern:
 
 ```text
 10.10.<VLAN-ID>.0/24
 ```
 
-Examples:
-
-```text
-VLAN 10 -> 10.10.10.0/24
-VLAN 20 -> 10.10.20.0/24
-VLAN 30 -> 10.10.30.0/24
-VLAN 40 -> 10.10.40.0/24
-VLAN 99 -> 10.10.99.0/24
-```
-
 The `.1` address is reserved as the default gateway for each routed internal subnet.
-
-The planned addressing convention is:
 
 | Address Range | Purpose |
 |---------------|---------|
@@ -98,9 +78,7 @@ The planned addressing convention is:
 | `.2 - .49` | Network infrastructure |
 | `.50 - .99` | Servers / static devices |
 | `.100 - .199` | DHCP clients |
-| `.200 - .254` | Reserved for future use |
-
-Client workstations will eventually use DHCP, while infrastructure devices and servers will use static IP addresses.
+| `.200 - .254` | Reserved |
 
 ## Important Static Addresses
 
@@ -124,46 +102,70 @@ Client workstations will eventually use DHCP, while infrastructure devices and s
 | ISP Public-LAN Interface | `198.51.100.1` |
 | PUBLIC-PC-01 | `198.51.100.10` |
 
-## Transit and WAN Networks
+## VLAN Configuration
 
-### Core-to-Firewall Transit
-
-```text
-Network: 172.16.0.0/30
-
-ASA-FW1:  172.16.0.1
-CORE-SW1: 172.16.0.2
-```
-
-A `/30` subnet is used because the point-to-point connection only requires two usable IP addresses.
-
-### Simulated WAN
+The following VLANs have been created on `CORE-SW1`, `ACCESS-SW1`, and `ACCESS-SW2`:
 
 ```text
-Network: 203.0.113.0/29
-
-ISP-R1:   203.0.113.1
-ASA-FW1:  203.0.113.2
+VLAN 10  CORP_USERS
+VLAN 20  ENGINEERING
+VLAN 30  SERVERS
+VLAN 40  GUEST
+VLAN 99  MANAGEMENT
+VLAN 999 PARKING_LOT
 ```
 
-The address `203.0.113.3` is reserved for a future static NAT mapping to the DMZ web server.
-
-### Simulated Internet
+VLANs were verified with:
 
 ```text
-Network: 198.51.100.0/24
-
-ISP-R1:       198.51.100.1
-PUBLIC-PC-01: 198.51.100.10
+show vlan brief
 ```
 
-This external network will later be used to test traffic from outside the enterprise environment.
+## Access Port Assignments
 
-## Planned Security Architecture
+### ACCESS-SW1
+
+| Port | Connected Device | VLAN |
+|------|------------------|------|
+| Fa0/1 | CORE-SW1 | Reserved for trunk configuration |
+| Fa0/2 | PC-CORP-01 | VLAN 10 |
+| Fa0/3 | PC-CORP-02 | VLAN 10 |
+| Fa0/4 | PC-ENG-01 | VLAN 20 |
+| Fa0/5 | SRV-INFRA-01 | VLAN 30 |
+| Fa0/6 | SRV-INTRANET-01 | VLAN 30 |
+
+### ACCESS-SW2
+
+| Port | Connected Device | VLAN |
+|------|------------------|------|
+| Fa0/1 | CORE-SW1 | Reserved for trunk configuration |
+| Fa0/2 | PC-ADMIN-01 | VLAN 99 |
+| Fa0/3 | PC-GUEST-01 | VLAN 40 |
+
+End-device ports were configured with:
+
+```text
+switchport mode access
+switchport access vlan <VLAN-ID>
+```
+
+The `Fa0/1` uplink on each access switch is intentionally being left for 802.1Q trunk configuration in Phase 5.
+
+## Verification
+
+Useful verification commands:
+
+```text
+show vlan brief
+show interfaces <interface> switchport
+```
+
+These commands confirm VLAN membership and access-port configuration.
+
+## Planned Security Features
 
 Future phases will implement and test:
 
-- VLAN-based network segmentation
 - 802.1Q trunking
 - Inter-VLAN routing
 - DHCP and DHCP relay
@@ -182,15 +184,17 @@ Future phases will implement and test:
 
 ## Design Decisions
 
-- Each VLAN uses a separate IP subnet to support routing and future security-policy enforcement.
-- `/24` networks are used for internal VLANs to keep the addressing scheme simple and easy to troubleshoot.
-- The `.1` address is consistently reserved as the default gateway.
+- Separate subnets are used for each VLAN to support routing and security policy enforcement.
+- `/24` networks keep the internal addressing plan simple and easy to troubleshoot.
+- `.1` is consistently reserved as the default gateway.
 - Servers and infrastructure devices use planned static addresses.
-- Corporate, engineering, and guest clients will receive addresses through DHCP in a later phase.
-- A `/30` subnet is used for the core-to-firewall transit link because only two usable addresses are required.
-- The DMZ is placed behind a dedicated firewall interface rather than directly inside the internal LAN.
-- The management network is separated from normal user traffic to support restricted administrative access.
-- VLAN 999 is reserved as a parking VLAN for unused switch ports.
+- Client workstations will receive DHCP addresses in a later phase.
+- A `/30` subnet is used for the core-to-firewall transit link because only two usable addresses are needed.
+- The DMZ is separated behind a dedicated firewall interface.
+- The management network is separated from normal user traffic.
+- VLAN 999 is reserved for unused switch ports.
+- End-device interfaces are configured as static access ports.
+- Access-switch uplinks are being reserved for trunk configuration.
 
 ## Project Structure
 
@@ -202,15 +206,12 @@ secure-enterprise-network-lab/
 ├── docs/
 │   └── ip-addressing.md
 ├── screenshots/
-│   └── topology.png
+│   ├── topology.png
+│   ├── access-sw1-vlan-verification.png
+│   └── access-sw2-vlan-verification.png
 └── topology/
     └── enterprise-network.pkt
 ```
-
-- `configs/` will contain sanitized device configurations in later phases.
-- `docs/` contains the IP addressing plan and will later include security policies and test documentation.
-- `screenshots/` contains the current topology image and will later contain configuration and testing evidence.
-- `topology/` contains the Cisco Packet Tracer project file.
 
 ## Tools
 
@@ -236,7 +237,7 @@ secure-enterprise-network-lab/
 - [x] Phase 1 - Create project structure
 - [x] Phase 2 - Build physical network topology
 - [x] Phase 3 - Design IP addressing scheme
-- [ ] Phase 4 - Configure VLANs
+- [x] Phase 4 - Configure VLANs and access port assignments
 - [ ] Phase 5 - Configure trunk links
 - [ ] Phase 6 - Configure inter-VLAN routing
 - [ ] Phase 7 - Configure DHCP
@@ -256,4 +257,4 @@ secure-enterprise-network-lab/
 
 ## Repository Status
 
-This repository is actively being developed. The physical topology and IP addressing design are complete. Device configuration, routing, security controls, validation results, and additional documentation will be added as each future phase is completed.
+The physical topology, IP addressing plan, VLAN database, and end-device access-port assignments are complete. Trunking, routing, network services, firewall controls, security policies, and validation testing will be added in future phases.
