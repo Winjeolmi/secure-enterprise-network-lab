@@ -4,81 +4,164 @@
 
 This project is an in-progress secure enterprise network lab built in **Cisco Packet Tracer**. The goal is to design, configure, secure, and test a small enterprise-style network while practicing networking and security concepts commonly used in real environments.
 
-The lab is being developed in phases so that each part of the network can be configured, tested, and documented independently.
+The lab is being developed in phases so that each part of the network can be designed, implemented, tested, and documented independently.
 
 ## Current Status
 
-**Completed through Phase 2: Physical Network Topology**
+**Completed through Phase 3: IP Addressing Design**
 
-So far, I have:
+So far, the project includes:
 
-- Created the project structure for documentation, configurations, screenshots, and topology files
-- Built the initial enterprise network topology in Cisco Packet Tracer
-- Added and organized the core network devices
-- Added internal client systems and servers
-- Added a simulated ISP/Internet connection
-- Added a firewall to separate the internal network, DMZ, and external network
-- Saved the Packet Tracer topology for continued development
+- A complete physical enterprise network topology in Cisco Packet Tracer
+- A simulated ISP and external network
+- A Cisco ASA firewall separating internal, DMZ, and external networks
+- A Layer 3 core switch and two access switches
+- Corporate, engineering, guest, management, server, and DMZ segments
+- A complete VLAN and subnet addressing plan
+- Planned static infrastructure addresses
+- Planned DHCP client ranges
+- A dedicated core-to-firewall transit network
+- A simulated WAN and public network
+- Updated Packet Tracer topology labels showing network roles and addressing
 
-Configuration of VLANs, IP addressing, routing, firewall policies, and other security controls will be added in later phases.
+No VLAN, routing, DHCP, ACL, firewall, NAT, or switch-security configurations have been implemented yet.
 
-## Network Architecture
+## Network Topology
 
-The current topology is designed to represent a small enterprise network.
+![Enterprise Network Topology](screenshots/topology.png)
 
-The lab includes:
-
-- 1 Cisco ASA firewall
-- 1 simulated ISP router
-- 1 Layer 3 core switch
-- 2 access switches
-- Internal user workstations
-- Engineering workstation(s)
-- Guest workstation(s)
-- Management workstation
-- Internal servers
-- DMZ web server
-- Simulated external host(s)
-
-The intended architecture is:
+The current topology is designed to represent a small enterprise environment with internal users, servers, network management, a DMZ, an edge firewall, and a simulated Internet connection.
 
 ```text
-                         Internet
-                            |
-                         ISP-R1
-                            |
-                         ASA-FW1
-                        /       \
-                   Inside        DMZ
-                      |           |
-                  CORE-SW1     DMZ Server
-                   /     \
-             ACCESS-SW1  ACCESS-SW2
-                |            |
-          Internal Hosts   Internal Hosts
+                         PUBLIC-PC-01
+                              |
+                      Simulated Internet
+                       198.51.100.0/24
+                              |
+                           ISP-R1
+                              |
+                       203.0.113.0/29
+                              |
+                           ASA-FW1
+                          /       \
+                         /         \
+              172.16.0.0/30       DMZ
+                       |       10.10.50.0/24
+                       |             |
+                   CORE-SW1      DMZ-WEB-01
+                    /     \
+                   /       \
+          ACCESS-SW1       ACCESS-SW2
+             |                  |
+       Internal VLANs      Internal VLANs
 ```
 
-## Planned Network Segmentation
+## VLAN and Subnet Design
 
-The network will eventually be divided into multiple VLANs to separate users, servers, guests, and management traffic.
+| VLAN | Purpose | Subnet | Default Gateway |
+|------|---------|--------|-----------------|
+| 10 | Corporate Users | `10.10.10.0/24` | `10.10.10.1` |
+| 20 | Engineering | `10.10.20.0/24` | `10.10.20.1` |
+| 30 | Internal Servers | `10.10.30.0/24` | `10.10.30.1` |
+| 40 | Guest Network | `10.10.40.0/24` | `10.10.40.1` |
+| 50 | DMZ | `10.10.50.0/24` | `10.10.50.1` |
+| 99 | Network Management | `10.10.99.0/24` | `10.10.99.1` |
+| 999 | Parking / Unused Ports | None | None |
 
-Planned VLANs include:
+VLAN 999 will later be used to isolate unused switch ports.
 
-| VLAN | Purpose |
-|------|---------|
-| VLAN 10 | Corporate Users |
-| VLAN 20 | Engineering |
-| VLAN 30 | Internal Servers |
-| VLAN 40 | Guest Network |
-| VLAN 50 | DMZ |
-| VLAN 99 | Network Management |
-| VLAN 999 | Unused / Parking VLAN |
+## Addressing Strategy
 
-The VLAN configuration has **not yet been implemented**.
+The internal addressing scheme follows a predictable structure:
 
-## Planned Security Features
+```text
+10.10.<VLAN-ID>.0/24
+```
 
-Future phases of this project will implement and test:
+Examples:
+
+```text
+VLAN 10 -> 10.10.10.0/24
+VLAN 20 -> 10.10.20.0/24
+VLAN 30 -> 10.10.30.0/24
+VLAN 40 -> 10.10.40.0/24
+VLAN 99 -> 10.10.99.0/24
+```
+
+The `.1` address is reserved as the default gateway for each routed internal subnet.
+
+The planned addressing convention is:
+
+| Address Range | Purpose |
+|---------------|---------|
+| `.1` | Default gateway |
+| `.2 - .49` | Network infrastructure |
+| `.50 - .99` | Servers / static devices |
+| `.100 - .199` | DHCP clients |
+| `.200 - .254` | Reserved for future use |
+
+Client workstations will eventually use DHCP, while infrastructure devices and servers will use static IP addresses.
+
+## Important Static Addresses
+
+| Device / Interface | IP Address |
+|--------------------|------------|
+| Corporate VLAN Gateway | `10.10.10.1` |
+| Engineering VLAN Gateway | `10.10.20.1` |
+| Server VLAN Gateway | `10.10.30.1` |
+| Guest VLAN Gateway | `10.10.40.1` |
+| ASA DMZ Interface | `10.10.50.1` |
+| Management VLAN Gateway | `10.10.99.1` |
+| SRV-INFRA-01 | `10.10.30.10` |
+| SRV-INTRANET-01 | `10.10.30.20` |
+| SRV-DMZ-WEB-01 | `10.10.50.10` |
+| PC-ADMIN-01 | `10.10.99.10` |
+| ASA Inside Interface | `172.16.0.1` |
+| CORE-SW1 Firewall Uplink | `172.16.0.2` |
+| ISP-R1 WAN Interface | `203.0.113.1` |
+| ASA Outside Interface | `203.0.113.2` |
+| Reserved Public DMZ NAT Address | `203.0.113.3` |
+| ISP Public-LAN Interface | `198.51.100.1` |
+| PUBLIC-PC-01 | `198.51.100.10` |
+
+## Transit and WAN Networks
+
+### Core-to-Firewall Transit
+
+```text
+Network: 172.16.0.0/30
+
+ASA-FW1:  172.16.0.1
+CORE-SW1: 172.16.0.2
+```
+
+A `/30` subnet is used because the point-to-point connection only requires two usable IP addresses.
+
+### Simulated WAN
+
+```text
+Network: 203.0.113.0/29
+
+ISP-R1:   203.0.113.1
+ASA-FW1:  203.0.113.2
+```
+
+The address `203.0.113.3` is reserved for a future static NAT mapping to the DMZ web server.
+
+### Simulated Internet
+
+```text
+Network: 198.51.100.0/24
+
+ISP-R1:       198.51.100.1
+PUBLIC-PC-01: 198.51.100.10
+```
+
+This external network will later be used to test traffic from outside the enterprise environment.
+
+## Planned Security Architecture
+
+Future phases will implement and test:
 
 - VLAN-based network segmentation
 - 802.1Q trunking
@@ -91,11 +174,23 @@ Future phases of this project will implement and test:
 - Cisco ASA firewall policies
 - NAT and PAT
 - DMZ isolation
-- SSH-only network device administration
+- SSH-only device administration
 - Switch port security
 - BPDU Guard
 - Disabled unused switch ports
 - Security testing and traffic-flow validation
+
+## Design Decisions
+
+- Each VLAN uses a separate IP subnet to support routing and future security-policy enforcement.
+- `/24` networks are used for internal VLANs to keep the addressing scheme simple and easy to troubleshoot.
+- The `.1` address is consistently reserved as the default gateway.
+- Servers and infrastructure devices use planned static addresses.
+- Corporate, engineering, and guest clients will receive addresses through DHCP in a later phase.
+- A `/30` subnet is used for the core-to-firewall transit link because only two usable addresses are required.
+- The DMZ is placed behind a dedicated firewall interface rather than directly inside the internal LAN.
+- The management network is separated from normal user traffic to support restricted administrative access.
+- VLAN 999 is reserved as a parking VLAN for unused switch ports.
 
 ## Project Structure
 
@@ -105,18 +200,17 @@ secure-enterprise-network-lab/
 ├── README.md
 ├── configs/
 ├── docs/
+│   └── ip-addressing.md
 ├── screenshots/
+│   └── topology.png
 └── topology/
-    ├── enterprise-network.pkt
-    └── topology.png
+    └── enterprise-network.pkt
 ```
 
-As the project progresses:
-
-- `configs/` will contain sanitized device configurations
-- `docs/` will contain the addressing plan, security policies, and test documentation
-- `screenshots/` will contain configuration and security validation evidence
-- `topology/` contains the Cisco Packet Tracer lab and topology image
+- `configs/` will contain sanitized device configurations in later phases.
+- `docs/` contains the IP addressing plan and will later include security policies and test documentation.
+- `screenshots/` contains the current topology image and will later contain configuration and testing evidence.
+- `topology/` contains the Cisco Packet Tracer project file.
 
 ## Tools
 
@@ -128,14 +222,12 @@ As the project progresses:
 
 ## Project Goals
 
-The main goals of this project are to:
-
 1. Build a realistic enterprise-style network from the ground up
 2. Practice Layer 2 and Layer 3 networking concepts
 3. Implement network segmentation and access controls
 4. Configure perimeter and internal network security
 5. Understand how traffic moves through an enterprise network
-6. Test both allowed and denied traffic flows
+6. Test both permitted and denied traffic flows
 7. Practice network troubleshooting
 8. Document the network in a way that demonstrates technical understanding
 
@@ -143,7 +235,7 @@ The main goals of this project are to:
 
 - [x] Phase 1 - Create project structure
 - [x] Phase 2 - Build physical network topology
-- [ ] Phase 3 - Design IP addressing scheme
+- [x] Phase 3 - Design IP addressing scheme
 - [ ] Phase 4 - Configure VLANs
 - [ ] Phase 5 - Configure trunk links
 - [ ] Phase 6 - Configure inter-VLAN routing
@@ -164,4 +256,4 @@ The main goals of this project are to:
 
 ## Repository Status
 
-This repository is actively being developed. Configuration files, security policies, test results, and additional documentation will be added as each phase is completed.
+This repository is actively being developed. The physical topology and IP addressing design are complete. Device configuration, routing, security controls, validation results, and additional documentation will be added as each future phase is completed.
