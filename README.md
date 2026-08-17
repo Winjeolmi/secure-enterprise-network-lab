@@ -2,25 +2,34 @@
 
 ## Overview
 
-This project is an in-progress secure enterprise network lab built in **Cisco Packet Tracer**. The goal is to design, configure, secure, and test a small enterprise-style network while practicing networking and security concepts commonly used in real environments.
+This project is an in-progress secure enterprise network lab built in **Cisco Packet Tracer**. The goal is to design, configure, secure, and test a small enterprise-style network while practicing core networking and security concepts.
 
-The lab is being developed in phases so that each part of the network can be designed, implemented, tested, and documented independently.
+The lab is being developed in phases so that each part of the network can be designed, implemented, verified, and documented before moving on.
 
 ## Current Status
 
-**Completed through Phase 4: VLAN Configuration and Access Port Assignment**
+**Completed through Phase 6: Inter-VLAN Routing**
 
-Completed so far:
+The network now includes:
 
-- Built the physical enterprise topology in Cisco Packet Tracer
-- Added a simulated ISP, Cisco ASA firewall, Layer 3 core switch, two access switches, internal hosts, servers, a DMZ server, and a simulated external host
-- Designed the VLAN and IP addressing plan
-- Planned static infrastructure addresses and DHCP client ranges
-- Created VLANs 10, 20, 30, 40, 99, and 999 on the internal switches
-- Assigned end-device access ports to their intended VLANs
-- Verified VLAN membership using Cisco IOS show commands
+- A complete enterprise-style physical topology
+- A simulated ISP and external network
+- A Cisco ASA firewall
+- A Layer 3 core switch
+- Two Layer 2 access switches
+- Corporate, Engineering, Server, Guest, Management, and DMZ segments
+- A documented VLAN and IP addressing plan
+- VLAN configuration across the switching infrastructure
+- Static access-port assignments
+- 802.1Q trunk links between the access switches and core
+- Layer 3 SVIs on `CORE-SW1`
+- Inter-VLAN routing between internal VLANs
+- Static endpoint addressing for routing validation
+- Successful connectivity tests between different VLANs
 
-Trunking, inter-VLAN routing, DHCP, firewall rules, NAT, ACLs, and other security controls have not yet been implemented.
+The network is currently functional but intentionally permissive. Security controls such as ACLs, firewall policies, NAT/PAT, guest isolation, and secure device management will be added in later phases.
+
+---
 
 ## Network Topology
 
@@ -46,6 +55,8 @@ Trunking, inter-VLAN routing, DHCP, firewall rules, NAT, ACLs, and other securit
                     /     \
                    /       \
           ACCESS-SW1       ACCESS-SW2
+          /   |   \          /     \
+       Corp  Eng  Servers  Admin   Guest
 ```
 
 ## VLAN and Subnet Design
@@ -60,17 +71,17 @@ Trunking, inter-VLAN routing, DHCP, firewall rules, NAT, ACLs, and other securit
 | 99 | Network Management | `10.10.99.0/24` | `10.10.99.1` |
 | 999 | Parking / Unused Ports | None | None |
 
-VLAN 50 is part of the DMZ design and will be handled through the firewall side of the topology rather than across the internal access switches.
+VLAN 50 belongs to the DMZ side of the design and is not carried through the internal access-switch trunks. VLAN 999 is reserved for unused switch ports and will be used later during Layer 2 hardening.
 
 ## Addressing Strategy
 
-Internal VLANs follow this pattern:
+Internal VLANs follow a predictable addressing pattern:
 
 ```text
 10.10.<VLAN-ID>.0/24
 ```
 
-The `.1` address is reserved as the default gateway for each routed internal subnet.
+The `.1` address is used as the default gateway for each routed internal VLAN.
 
 | Address Range | Purpose |
 |---------------|---------|
@@ -78,18 +89,18 @@ The `.1` address is reserved as the default gateway for each routed internal sub
 | `.2 - .49` | Network infrastructure |
 | `.50 - .99` | Servers / static devices |
 | `.100 - .199` | DHCP clients |
-| `.200 - .254` | Reserved |
+| `.200 - .254` | Reserved for future use |
 
 ## Important Static Addresses
 
 | Device / Interface | IP Address |
 |--------------------|------------|
-| Corporate VLAN Gateway | `10.10.10.1` |
-| Engineering VLAN Gateway | `10.10.20.1` |
-| Server VLAN Gateway | `10.10.30.1` |
-| Guest VLAN Gateway | `10.10.40.1` |
+| VLAN 10 Gateway | `10.10.10.1` |
+| VLAN 20 Gateway | `10.10.20.1` |
+| VLAN 30 Gateway | `10.10.30.1` |
+| VLAN 40 Gateway | `10.10.40.1` |
 | ASA DMZ Interface | `10.10.50.1` |
-| Management VLAN Gateway | `10.10.99.1` |
+| VLAN 99 Gateway | `10.10.99.1` |
 | SRV-INFRA-01 | `10.10.30.10` |
 | SRV-INTRANET-01 | `10.10.30.20` |
 | SRV-DMZ-WEB-01 | `10.10.50.10` |
@@ -115,7 +126,7 @@ VLAN 99  MANAGEMENT
 VLAN 999 PARKING_LOT
 ```
 
-VLANs were verified with:
+VLAN configuration was verified using:
 
 ```text
 show vlan brief
@@ -127,7 +138,7 @@ show vlan brief
 
 | Port | Connected Device | VLAN |
 |------|------------------|------|
-| Fa0/1 | CORE-SW1 | Reserved for trunk configuration |
+| Fa0/1 | CORE-SW1 | 802.1Q trunk |
 | Fa0/2 | PC-CORP-01 | VLAN 10 |
 | Fa0/3 | PC-CORP-02 | VLAN 10 |
 | Fa0/4 | PC-ENG-01 | VLAN 20 |
@@ -138,63 +149,193 @@ show vlan brief
 
 | Port | Connected Device | VLAN |
 |------|------------------|------|
-| Fa0/1 | CORE-SW1 | Reserved for trunk configuration |
+| Fa0/1 | CORE-SW1 | 802.1Q trunk |
 | Fa0/2 | PC-ADMIN-01 | VLAN 99 |
 | Fa0/3 | PC-GUEST-01 | VLAN 40 |
 
-End-device ports were configured with:
+End-device interfaces are configured as static access ports using:
 
 ```text
 switchport mode access
 switchport access vlan <VLAN-ID>
 ```
 
-The `Fa0/1` uplink on each access switch is intentionally being left for 802.1Q trunk configuration in Phase 5.
+## 802.1Q Trunking
 
-## Verification
+The uplinks between the access switches and `CORE-SW1` are configured as Layer 2 trunks.
 
-Useful verification commands:
+### ACCESS-SW1 Trunk
+
+Allowed VLANs:
+
+```text
+10,20,30,99
+```
+
+### ACCESS-SW2 Trunk
+
+Allowed VLANs:
+
+```text
+40,99
+```
+
+The trunks are intentionally restricted to only the VLANs that need to cross each link.
+
+Trunk operation can be verified using:
+
+```text
+show interfaces trunk
+```
+
+Example evidence:
+
+![Trunk Verification](screenshots/trunk-verification.png)
+
+## Inter-VLAN Routing
+
+`CORE-SW1` is a multilayer switch and now performs Layer 3 routing between the internal VLANs.
+
+IP routing was enabled with:
+
+```text
+ip routing
+```
+
+The following Switch Virtual Interfaces (SVIs) were configured:
+
+```text
+interface vlan 10
+ ip address 10.10.10.1 255.255.255.0
+
+interface vlan 20
+ ip address 10.10.20.1 255.255.255.0
+
+interface vlan 30
+ ip address 10.10.30.1 255.255.255.0
+
+interface vlan 40
+ ip address 10.10.40.1 255.255.255.0
+
+interface vlan 99
+ ip address 10.10.99.1 255.255.255.0
+```
+
+Each SVI acts as the default gateway for its VLAN.
+
+SVI status can be verified using:
+
+```text
+show ip interface brief
+```
+
+Example evidence:
+
+![SVI Verification](screenshots/svi-verification.png)
+
+## Routing Table
+
+Because `CORE-SW1` has a Layer 3 interface in each internal VLAN, those networks appear as directly connected routes.
+
+Verification command:
+
+```text
+show ip route
+```
+
+Expected connected networks include:
+
+```text
+10.10.10.0/24
+10.10.20.0/24
+10.10.30.0/24
+10.10.40.0/24
+10.10.99.0/24
+```
+
+Example evidence:
+
+![Routing Verification](screenshots/routing-verification.png)
+
+## Temporary Endpoint Addressing for Testing
+
+Until DHCP is configured, internal endpoints use static addresses for routing validation.
+
+| Device | IP Address | Default Gateway |
+|--------|------------|-----------------|
+| PC-CORP-01 | `10.10.10.100` | `10.10.10.1` |
+| PC-CORP-02 | `10.10.10.101` | `10.10.10.1` |
+| PC-ENG-01 | `10.10.20.100` | `10.10.20.1` |
+| SRV-INFRA-01 | `10.10.30.10` | `10.10.30.1` |
+| SRV-INTRANET-01 | `10.10.30.20` | `10.10.30.1` |
+| PC-GUEST-01 | `10.10.40.100` | `10.10.40.1` |
+| PC-ADMIN-01 | `10.10.99.10` | `10.10.99.1` |
+
+The server and management addresses are intended to remain static. Corporate, Engineering, and Guest clients will later be moved to DHCP.
+
+## Inter-VLAN Routing Validation
+
+Routing was validated by testing connectivity between devices in different VLANs.
+
+Example test paths include:
+
+```text
+Corporate -> Engineering
+Corporate -> Servers
+Management -> Corporate
+Guest -> Internal Servers
+```
+
+The Guest VLAN can currently reach internal resources because no ACLs have been applied yet. This is intentional at this stage. Later security phases will restrict Guest traffic so it can reach permitted external resources without accessing protected internal networks.
+
+Example evidence:
+
+![Inter-VLAN Ping](screenshots/inter-vlan-ping.png)
+
+## Useful Verification Commands
 
 ```text
 show vlan brief
+show interfaces trunk
 show interfaces <interface> switchport
+show ip interface brief
+show ip route
+show ip arp
 ```
 
-These commands confirm VLAN membership and access-port configuration.
+## Design Decisions
+
+- Separate VLANs and subnets are used to segment different types of enterprise traffic.
+- `/24` subnets keep the addressing plan simple and predictable.
+- `.1` is consistently used as the default gateway address.
+- End-user devices connect through Layer 2 access ports.
+- Access switches provide endpoint connectivity while `CORE-SW1` aggregates the network.
+- 802.1Q trunks allow multiple VLANs to cross one physical uplink.
+- Each trunk is restricted to only the VLANs required on that access switch.
+- VLAN 99 crosses both trunks so the Management network can eventually reach all infrastructure devices.
+- `CORE-SW1` performs centralized inter-VLAN routing using SVIs.
+- The DMZ is kept separate behind the ASA firewall.
+- The network is intentionally permissive before ACLs are introduced so later security controls can be tested against a known working baseline.
 
 ## Planned Security Features
 
-Future phases will implement and test:
+Future phases will implement and validate:
 
-- 802.1Q trunking
-- Inter-VLAN routing
 - DHCP and DHCP relay
 - DNS and internal services
-- Access Control Lists (ACLs)
-- Guest network isolation
-- Management network restrictions
-- Cisco ASA firewall policies
+- Core-to-firewall routing
+- Cisco ASA security zones
 - NAT and PAT
-- DMZ isolation
+- DMZ access controls
+- Guest VLAN isolation
+- Access Control Lists (ACLs)
+- Restricted management access
 - SSH-only device administration
 - Switch port security
 - BPDU Guard
 - Disabled unused switch ports
-- Security testing and traffic-flow validation
-
-## Design Decisions
-
-- Separate subnets are used for each VLAN to support routing and security policy enforcement.
-- `/24` networks keep the internal addressing plan simple and easy to troubleshoot.
-- `.1` is consistently reserved as the default gateway.
-- Servers and infrastructure devices use planned static addresses.
-- Client workstations will receive DHCP addresses in a later phase.
-- A `/30` subnet is used for the core-to-firewall transit link because only two usable addresses are needed.
-- The DMZ is separated behind a dedicated firewall interface.
-- The management network is separated from normal user traffic.
-- VLAN 999 is reserved for unused switch ports.
-- End-device interfaces are configured as static access ports.
-- Access-switch uplinks are being reserved for trunk configuration.
+- Security test plans
+- Packet Tracer Simulation Mode validation
 
 ## Project Structure
 
@@ -208,7 +349,11 @@ secure-enterprise-network-lab/
 ├── screenshots/
 │   ├── topology.png
 │   ├── access-sw1-vlan-verification.png
-│   └── access-sw2-vlan-verification.png
+│   ├── access-sw2-vlan-verification.png
+│   ├── trunk-verification.png
+│   ├── svi-verification.png
+│   ├── routing-verification.png
+│   └── inter-vlan-ping.png
 └── topology/
     └── enterprise-network.pkt
 ```
@@ -218,19 +363,22 @@ secure-enterprise-network-lab/
 - Cisco Packet Tracer
 - Cisco IOS CLI
 - Cisco ASA
+- TCP/IP
+- 802.1Q
 - Git
 - GitHub
 
 ## Project Goals
 
 1. Build a realistic enterprise-style network from the ground up
-2. Practice Layer 2 and Layer 3 networking concepts
-3. Implement network segmentation and access controls
-4. Configure perimeter and internal network security
-5. Understand how traffic moves through an enterprise network
-6. Test both permitted and denied traffic flows
-7. Practice network troubleshooting
-8. Document the network in a way that demonstrates technical understanding
+2. Practice Layer 2 switching and VLAN segmentation
+3. Configure 802.1Q trunking
+4. Implement Layer 3 inter-VLAN routing
+5. Configure centralized network services
+6. Apply least-privilege security controls
+7. Test permitted and denied traffic flows
+8. Practice structured network troubleshooting
+9. Document technical decisions and validation results
 
 ## Progress
 
@@ -238,8 +386,8 @@ secure-enterprise-network-lab/
 - [x] Phase 2 - Build physical network topology
 - [x] Phase 3 - Design IP addressing scheme
 - [x] Phase 4 - Configure VLANs and access port assignments
-- [ ] Phase 5 - Configure trunk links
-- [ ] Phase 6 - Configure inter-VLAN routing
+- [x] Phase 5 - Configure 802.1Q trunk links
+- [x] Phase 6 - Configure inter-VLAN routing
 - [ ] Phase 7 - Configure DHCP
 - [ ] Phase 8 - Configure DNS and internal services
 - [ ] Phase 9 - Connect the core network to the firewall
@@ -257,4 +405,6 @@ secure-enterprise-network-lab/
 
 ## Repository Status
 
-The physical topology, IP addressing plan, VLAN database, and end-device access-port assignments are complete. Trunking, routing, network services, firewall controls, security policies, and validation testing will be added in future phases.
+The enterprise topology, IP addressing plan, VLAN configuration, access-port assignments, trunk links, SVIs, and inter-VLAN routing are complete.
+
+At this stage, the internal network is fully routed but intentionally permissive. The next phases will add centralized services and progressively apply security controls to turn the working network into a secured enterprise environment.
