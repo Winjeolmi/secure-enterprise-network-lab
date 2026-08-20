@@ -8,7 +8,7 @@ The lab is being built in phases so that each part of the network can be designe
 
 ## Current Status
 
-**Completed through Phase 8: DNS and Internal Web Services**
+**Completed through Phase 9: Core-to-Firewall Connectivity**
 
 The network now includes:
 
@@ -27,8 +27,11 @@ The network now includes:
 - Centralized DNS service
 - An internal HTTP intranet server
 - DNS-based access to the internal intranet using `intranet.corp.lab`
+- A Layer 3 transit link between `CORE-SW1` and `ASA-FW1`
+- A default route from the core toward the firewall
+- Static ASA routes back to the internal VLANs
 
-The internal network is currently functional but intentionally permissive. Firewall policies, NAT/PAT, guest isolation, management restrictions, switch hardening, and other security controls will be added in later phases.
+The internal network is functional and now has a routed path to the firewall. Internet access, NAT/PAT, DMZ publishing, guest isolation, management restrictions, switch hardening, and other security controls will be added in later phases.
 
 ---
 
@@ -338,6 +341,152 @@ Example evidence:
 
 ![Intranet Browser](screenshots/intranet-browser.png)
 
+---
+
+## Core-to-Firewall Transit Network
+
+Phase 9 introduced a dedicated point-to-point Layer 3 transit network between `CORE-SW1` and `ASA-FW1`.
+
+```text
+CORE-SW1
+172.16.0.2/30
+     |
+     | 172.16.0.0/30
+     |
+172.16.0.1/30
+ASA-FW1
+```
+
+The `/30` subnet provides exactly two usable host addresses:
+
+```text
+172.16.0.0  Network
+172.16.0.1  ASA-FW1
+172.16.0.2  CORE-SW1
+172.16.0.3  Broadcast
+```
+
+### CORE-SW1 Firewall Uplink
+
+The physical switch port connected to `ASA-FW1` is configured as a Layer 3 routed port rather than a Layer 2 switchport.
+
+```text
+interface <CORE-ASA-PORT>
+ description L3_TO_ASA-FW1
+ no switchport
+ ip address 172.16.0.2 255.255.255.252
+ no shutdown
+```
+
+The `no switchport` command converts the interface into a routed Layer 3 interface.
+
+Example evidence:
+
+![Core Firewall Transit](screenshots/core-firewall-transit.png)
+
+### ASA Inside Interface
+
+The Packet Tracer ASA uses an ASA 5505-style switching model. The physical Ethernet port connected to `CORE-SW1` operates as a Layer 2 access port, while the Layer 3 address and firewall attributes are configured on a VLAN interface.
+
+Logical inside interface:
+
+```text
+interface vlan 1
+ nameif inside
+ security-level 100
+ ip address 172.16.0.1 255.255.255.252
+ no shutdown
+```
+
+The physical ASA port connected to the core is assigned to VLAN 1:
+
+```text
+interface <ASA-CORE-PORT>
+ switchport access vlan 1
+ no shutdown
+```
+
+Conceptually:
+
+```text
+CORE-SW1
+172.16.0.2
+     |
+     | Layer 3 transit
+     |
+ASA physical Ethernet port
+     |
+     | Layer 2 access port
+     |
+ASA Vlan1
+172.16.0.1
+nameif inside
+security-level 100
+```
+
+Example evidence:
+
+![ASA Inside Interface](screenshots/asa-inside-interface.png)
+
+### CORE-SW1 Default Route
+
+`CORE-SW1` now uses `ASA-FW1` as its gateway of last resort.
+
+```text
+ip route 0.0.0.0 0.0.0.0 172.16.0.1
+```
+
+Example routing-table entry:
+
+```text
+S* 0.0.0.0/0 via 172.16.0.1
+```
+
+Example evidence:
+
+![Core Default Route](screenshots/core-default-route.png)
+
+### ASA Routes to Internal VLANs
+
+`ASA-FW1` requires return routes for internal subnets located behind `CORE-SW1`.
+
+```text
+route inside 10.10.10.0 255.255.255.0 172.16.0.2
+route inside 10.10.20.0 255.255.255.0 172.16.0.2
+route inside 10.10.30.0 255.255.255.0 172.16.0.2
+route inside 10.10.40.0 255.255.255.0 172.16.0.2
+route inside 10.10.99.0 255.255.255.0 172.16.0.2
+```
+
+VLAN 50 is not included because the DMZ will connect directly to the ASA in a later phase.
+
+Example evidence:
+
+![ASA Internal Routes](screenshots/asa-internal-routes.png)
+
+### Phase 9 Routing Logic
+
+Traffic leaving an internal client follows this hierarchy:
+
+```text
+PC-CORP-01
+10.10.10.x
+     |
+     | Default gateway
+     v
+CORE-SW1
+10.10.10.1
+     |
+     | Default route
+     v
+ASA-FW1
+172.16.0.1
+```
+
+Return traffic from the ASA uses static routes pointing toward `172.16.0.2`, which is `CORE-SW1`.
+
+At this stage, the core and firewall can route between each other, but Internet access is not expected yet because the ASA outside interface, ISP path, NAT/PAT, and final firewall policies are not complete.
+
 ## Current Validation
 
 The following behaviors have been validated:
@@ -479,7 +628,7 @@ secure-enterprise-network-lab/
 - [x] Phase 6 - Configure inter-VLAN routing
 - [x] Phase 7 - Configure DHCP and DHCP relay
 - [x] Phase 8 - Configure DNS and internal services
-- [ ] Phase 9 - Connect the core network to the firewall
+- [x] Phase 9 - Connect the core network to the firewall
 - [ ] Phase 10 - Configure firewall zones
 - [ ] Phase 11 - Configure NAT/PAT
 - [ ] Phase 12 - Configure the DMZ
@@ -494,6 +643,6 @@ secure-enterprise-network-lab/
 
 ## Repository Status
 
-The enterprise topology, IP addressing plan, VLAN configuration, access-port assignments, trunk links, SVIs, inter-VLAN routing, DHCP, DHCP relay, DNS, and internal HTTP services are complete.
+The enterprise topology, IP addressing plan, VLAN configuration, access-port assignments, trunk links, SVIs, inter-VLAN routing, DHCP, DHCP relay, DNS, internal HTTP services, and core-to-firewall transit routing are complete.
 
-At this stage, the internal network provides centralized addressing and name-resolution services and can route between all internal VLANs. The next phases will connect the internal network to the ASA firewall and progressively apply security controls to transform the working network into a secured enterprise environment.
+At this stage, the internal network provides centralized addressing and name-resolution services, routes between all internal VLANs, and has a functioning Layer 3 path to the ASA firewall. The next phases will configure firewall zones, outside connectivity, NAT/PAT, DMZ services, and progressively stricter security controls.
